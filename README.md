@@ -66,7 +66,7 @@ The backend serves the built frontend automatically from `frontend/dist/`.
 
 ## Configuration
 
-All settings can be configured via environment variables (`.env`) or the in-app settings UI.
+All settings can be configured via environment variables (`.env`) **or directly from the in-app Settings UI** (click the gear icon). You can set your LLM provider, API keys, model, and GitHub token from the UI without editing any files.
 
 | Variable | Default | Description |
 |---|---|---|
