@@ -98,29 +98,6 @@ LLM_BASE_URL=http://localhost:11434
 LLM_RATE_LIMIT_TPM=0
 ```
 
-## Architecture
-
-```
-┌─────────────┐     ┌──────────────────────────────────────────┐
-│   Browser   │────▶│      FastAPI Backend (port 8000)         │
-│  React SPA  │◀─── │                                          │
-│             │ WS  │      ┌──────────┐  ┌───────────┐         │
-│  Vite (dev) │ SSE │      │ Ingester │  │ Chat/RAG  │         │
-└─────────────┘     │      │ Git+API  │  │ Pipeline  │         │
-                    │      └────┬─────┘  └─────┬─────┘         │
-                    │           │              │               │
-                    │      ┌────▼──────────────▼────┐          │
-                    │      │   Knowledge Base       │          │
-                    │      │  ChromaDB + Embeddings │          │
-                    │      └────────────────────────┘          │
-                    │                                          │
-                    │      ┌──────────┐  ┌──────────┐          │
-                    │      │  SQLite  │  │  LiteLLM │          │
-                    │      │ Sessions │  │ Provider │          │
-                    │      └──────────┘  └──────────┘          │
-                    └──────────────────────────────────────────┘
-```
-
 | Layer | Technology |
 |---|---|
 | Frontend | React 18, TypeScript, Tailwind CSS, Vite |
@@ -132,41 +109,7 @@ LLM_RATE_LIMIT_TPM=0
 | LLM | LiteLLM (multi-provider) |
 | Embeddings | sentence-transformers (local) |
 
-## API Endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/repos` | Start ingesting a repo |
-| `GET` | `/api/repos` | List all repos |
-| `GET` | `/api/repos/:id` | Get repo details |
-| `POST` | `/api/repos/:id/sync` | Re-sync a repo |
-| `DELETE` | `/api/repos/:id` | Delete a repo |
-| `GET` | `/api/repos/:id/progress` | SSE progress stream |
-| `POST` | `/api/repos/:id/conversations` | Create conversation |
-| `GET` | `/api/repos/:id/conversations` | List conversations |
-| `GET` | `/api/conversations/:id/messages` | Get message history |
-| `DELETE` | `/api/conversations/:id` | Delete conversation |
-| `WS` | `/api/conversations/:id/chat` | WebSocket chat |
-| `GET` | `/api/settings` | Get settings |
-| `PUT` | `/api/settings` | Update settings |
-| `POST` | `/api/settings/test-llm` | Test LLM connection |
-| `GET` | `/api/rate-limits` | Rate limit status |
-| `POST` | `/api/repos/:id/resume` | Resume paused ingestion |
-
 Interactive API docs at **http://localhost:8000/docs**.
-
-## Data Storage
-
-All data lives in the `data/` directory (or Docker volume):
-
-```
-data/
-├── gitchat.db          # SQLite — repos, conversations, messages, settings
-├── repos/              # Bare git clones
-└── chromadb/           # Vector embeddings
-```
-
-To reset everything: stop the app and delete `data/`.
 
 ## License
 
