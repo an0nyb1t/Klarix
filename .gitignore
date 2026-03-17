@@ -1,0 +1,41 @@
+# ── Python ──────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.egg
+.pytest_cache/
+
+# ── Node ────────────────────────────────────────
+node_modules/
+frontend/dist/
+
+# ── Environment ─────────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# ── Runtime data ────────────────────────────────
+data/
+*.db
+*.sqlite
+
+# ── IDE / OS ────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Claude / Specs ──────────────────────────────
+CLAUDE.md
+SPEC.md
+ROADMAP.md
+.claude/
+
+# ── Logs ────────────────────────────────────────
+*.log

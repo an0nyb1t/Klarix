@@ -1,0 +1,11 @@
+# Don't send these to the Docker build context
+.git
+data/
+backend/.venv
+backend/.pytest_cache
+backend/__pycache__
+frontend/node_modules
+frontend/dist
+*.log
+.env
+.DS_Store
