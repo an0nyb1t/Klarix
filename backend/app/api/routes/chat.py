@@ -17,6 +17,7 @@ On rate limit:
   { "type": "rate_limited", "message": "...", "resets_at": "..." }
 """
 
+import asyncio
 import json
 import logging
 
@@ -35,6 +36,23 @@ from rate_limiter import RateLimitExceeded, RateLimitManager
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Chat"])
+
+
+async def _safe_send(websocket: WebSocket, payload: dict) -> None:
+    """Send JSON to the WebSocket, silently ignoring if the client already disconnected."""
+    try:
+        await websocket.send_text(json.dumps(payload))
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+
+
+async def _drain_stream(stream, conversation_id: str) -> None:
+    """Consume remaining stream chunks in the background so the DB save completes."""
+    try:
+        async for _ in stream:
+            pass  # Discard chunks — we just need the generator to finish for DB persistence
+    except Exception:
+        logger.warning("Background stream drain failed for %s", conversation_id)
 
 
 @router.websocket("/conversations/{conversation_id}/chat")
@@ -128,33 +146,40 @@ async def chat_websocket(conversation_id: str, websocket: WebSocket):
                         "message_id": stream.assistant_message_id,
                     }))
 
+                except (WebSocketDisconnect, RuntimeError):
+                    # Client disconnected mid-stream (e.g. switched conversations).
+                    # Drain remaining chunks in background so the DB save still runs.
+                    logger.debug("Client disconnected mid-stream for %s, draining in background", conversation_id)
+                    asyncio.create_task(_drain_stream(stream, conversation_id))
+                    return
+
                 except ValueError as e:
                     # Conversation or repo not found
-                    await websocket.send_text(json.dumps({
+                    await _safe_send(websocket, {
                         "type": "error",
                         "message": str(e),
-                    }))
+                    })
 
                 except RateLimitExceeded as e:
                     resets_at_str = e.resets_at.isoformat() if e.resets_at else None
-                    await websocket.send_text(json.dumps({
+                    await _safe_send(websocket, {
                         "type": "rate_limited",
                         "message": str(e),
                         "resets_at": resets_at_str,
-                    }))
+                    })
 
                 except LLMError as e:
-                    await websocket.send_text(json.dumps({
+                    await _safe_send(websocket, {
                         "type": "error",
                         "message": str(e),
-                    }))
+                    })
 
                 except Exception as e:
                     logger.exception("Unexpected error in chat WebSocket for %s", conversation_id)
-                    await websocket.send_text(json.dumps({
+                    await _safe_send(websocket, {
                         "type": "error",
                         "message": "An unexpected error occurred. Please try again.",
-                    }))
+                    })
 
         except WebSocketDisconnect:
             logger.debug("WebSocket disconnected for conversation %s", conversation_id)

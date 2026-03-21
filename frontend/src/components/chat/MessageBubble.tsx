@@ -111,7 +111,9 @@ const markdownComponents: Components = {
 }
 
 function formatTimestamp(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+  // Backend stores UTC — ensure JS parses as UTC so toLocaleString converts to local
+  const utcIso = iso.endsWith('Z') ? iso : iso + 'Z'
+  return new Date(utcIso).toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -125,32 +127,38 @@ export function MessageBubble({ message }: Props) {
   const timestamp = 'created_at' in message ? formatTimestamp(message.created_at) : undefined
 
   return (
-    <div className={`flex mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
-      {!isUser && (
-        <div className="w-7 h-7 rounded-full bg-gh-accent/20 flex items-center justify-center shrink-0 mr-2.5 mt-0.5">
-          <span className="text-gh-accent text-xs font-bold">G</span>
-        </div>
-      )}
+    <div className={`flex flex-col mb-4 ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+        {!isUser && (
+          <div className="w-7 h-7 rounded-full bg-gh-accent/20 flex items-center justify-center shrink-0 mr-2.5 mt-0.5">
+            <span className="text-gh-accent text-xs font-bold">G</span>
+          </div>
+        )}
 
-      <div
-        title={timestamp}
-        className={`max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
-          isUser
-            ? 'bg-gh-accent/15 text-gh-text rounded-tr-sm'
-            : 'bg-gh-surface border border-gh-border text-gh-text rounded-tl-sm'
-        }`}
-      >
-        {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        ) : (
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {message.content}
-          </ReactMarkdown>
-        )}
-        {isStreaming && (
-          <span className="inline-block w-1.5 h-4 bg-gh-accent ml-0.5 animate-pulse" />
-        )}
+        <div
+          className={`max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
+            isUser
+              ? 'bg-gh-accent/15 text-gh-text rounded-tr-sm'
+              : 'bg-gh-surface border border-gh-border text-gh-text rounded-tl-sm'
+          }`}
+        >
+          {isUser ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {message.content}
+            </ReactMarkdown>
+          )}
+          {isStreaming && (
+            <span className="inline-block w-1.5 h-4 bg-gh-accent ml-0.5 animate-pulse" />
+          )}
+        </div>
       </div>
+      {timestamp && (
+        <span className={`text-[10px] text-gh-muted mt-1 ${isUser ? 'mr-1' : 'ml-10'}`}>
+          {timestamp}
+        </span>
+      )}
     </div>
   )
 }

@@ -23,4 +23,10 @@ export const conversationsApi = {
       method: 'PATCH',
       body: JSON.stringify({ llm_provider: provider, llm_model: model }),
     }),
+
+  updateTitle: (id: string, title: string) =>
+    apiFetch<Conversation>(`/api/conversations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    }),
 }

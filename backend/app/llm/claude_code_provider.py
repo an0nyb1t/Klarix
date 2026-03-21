@@ -26,8 +26,8 @@ from app.llm.exceptions import LLMError
 
 logger = logging.getLogger(__name__)
 
-# CLI subprocess timeout in seconds
-_CLI_TIMEOUT = 120
+# CLI subprocess timeout in seconds (None = wait indefinitely)
+_CLI_TIMEOUT: float | None = None
 
 # Allowed environment variable keys passed to the subprocess.
 # This whitelist prevents backend secrets (API keys, tokens, DB URLs)
@@ -208,56 +208,45 @@ async def _stream_cli(command: list[str]) -> AsyncGenerator[str, None]:
     got_result = False
     error_message: str | None = None
 
-    try:
-        async with asyncio.timeout(_CLI_TIMEOUT):
-            while True:
-                line_bytes = await process.stdout.readline()
-                if not line_bytes:
-                    break
+    while True:
+        line_bytes = await process.stdout.readline()
+        if not line_bytes:
+            break
 
-                line = line_bytes.decode("utf-8", errors="replace").strip()
-                if not line:
-                    continue
+        line = line_bytes.decode("utf-8", errors="replace").strip()
+        if not line:
+            continue
 
-                # Parse JSON — skip malformed lines with a warning
-                try:
-                    event = json.loads(line)
-                except json.JSONDecodeError:
-                    logger.warning("Claude Code CLI: skipping malformed JSON line: %.100s", line)
-                    continue
+        # Parse JSON — skip malformed lines with a warning
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            logger.warning("Claude Code CLI: skipping malformed JSON line: %.100s", line)
+            continue
 
-                event_type = event.get("type")
+        event_type = event.get("type")
 
-                if event_type == "assistant":
-                    # SECURITY: only yield parsed text content, never raw lines
-                    message = event.get("message", {})
-                    for block in message.get("content", []):
-                        if block.get("type") == "text":
-                            text = block.get("text", "")
-                            if text:
-                                yield text
+        if event_type == "assistant":
+            # SECURITY: only yield parsed text content, never raw lines
+            message = event.get("message", {})
+            for block in message.get("content", []):
+                if block.get("type") == "text":
+                    text = block.get("text", "")
+                    if text:
+                        yield text
 
-                elif event_type == "rate_limit_event":
-                    _update_rate_limit_cache(event)
+        elif event_type == "rate_limit_event":
+            _update_rate_limit_cache(event)
 
-                elif event_type == "result":
-                    got_result = True
-                    if event.get("is_error"):
-                        error_message = event.get("result", "Unknown CLI error")
-                    # Non-error result — streaming is complete
+        elif event_type == "result":
+            got_result = True
+            if event.get("is_error"):
+                error_message = event.get("result", "Unknown CLI error")
+            # Non-error result — streaming is complete
 
-                elif event_type in ("system",):
-                    # Informational — log at debug level, don't yield
-                    logger.debug("Claude Code CLI init: session_id=%s", event.get("session_id"))
-
-    except asyncio.TimeoutError:
-        # SECURITY: kill (not just terminate) to ensure process ends
-        process.kill()
-        await process.wait()
-        raise LLMError(
-            f"Claude Code CLI timed out after {_CLI_TIMEOUT} seconds. "
-            "The request may have been too complex or the CLI is unresponsive."
-        )
+        elif event_type in ("system",):
+            # Informational — log at debug level, don't yield
+            logger.debug("Claude Code CLI init: session_id=%s", event.get("session_id"))
 
     # Collect any stderr output
     try:

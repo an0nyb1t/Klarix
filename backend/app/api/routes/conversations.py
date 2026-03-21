@@ -132,9 +132,10 @@ async def update_conversation(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Update the model override for a conversation (V1.2).
+    Update a conversation's title or model override.
 
-    Both llm_provider and llm_model must be set together, or both null to clear the override.
+    For model changes: both llm_provider and llm_model must be set together, or both null.
+    For title changes: send just { "title": "new name" }.
     """
     if (body.llm_provider is None) != (body.llm_model is None):
         raise HTTPException(
@@ -146,8 +147,11 @@ async def update_conversation(
     if conv is None:
         raise HTTPException(status_code=404, detail=f"Conversation '{conversation_id}' not found.")
 
-    conv.llm_provider = body.llm_provider
-    conv.llm_model = body.llm_model
+    if body.title is not None:
+        conv.title = body.title.strip()[:120] or conv.title
+    if body.llm_provider is not None or body.llm_model is not None:
+        conv.llm_provider = body.llm_provider
+        conv.llm_model = body.llm_model
     await db.commit()
     await db.refresh(conv)
 

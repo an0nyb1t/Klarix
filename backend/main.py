@@ -10,6 +10,8 @@ or:
 import asyncio
 import logging
 import os
+import signal
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -146,6 +148,13 @@ if os.path.isdir(frontend_dist):
 
 if __name__ == "__main__":
     import uvicorn
+
+    def _shutdown(sig, frame):
+        print("\nShutting down GitChat…")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
 
     uvicorn.run(
         "main:app",

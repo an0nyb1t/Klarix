@@ -170,6 +170,7 @@ export default function App() {
           repoName={selectedRepo.name}
           globalSettings={settings}
           onModelChange={handleModelChange}
+          onTitleChange={handleModelChange}
         />
       )
     }

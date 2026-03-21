@@ -55,6 +55,7 @@ class ConversationOut(BaseModel):
 
 
 class ConversationUpdateRequest(BaseModel):
+    title: str | None = None
     llm_provider: str | None = None
     llm_model: str | None = None
 
