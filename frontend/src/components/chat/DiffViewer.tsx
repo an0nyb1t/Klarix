@@ -63,7 +63,7 @@ export function DiffViewer({ diff, repoId, patchReady }: Props) {
       </div>
 
       {/* Diff lines */}
-      <pre className="overflow-x-auto p-2 text-xs font-mono leading-relaxed">
+      <pre className="p-2 text-xs font-mono leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
         {lines.map((line, i) => {
           let cls = 'text-gh-muted'
           if (line.startsWith('+') && !line.startsWith('+++')) {
