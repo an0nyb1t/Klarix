@@ -21,7 +21,7 @@ Your job is to write a concise summary that captures all important technical con
 
 
 SYSTEM_PROMPT_TEMPLATE = """\
-You are GitChat, an AI assistant that helps users understand GitHub repositories.
+You are Klarix, an AI assistant that helps users understand GitHub repositories.
 You have access to the repository's source code, commit history, issues, and pull requests.
 
 Repository: {repo_name}

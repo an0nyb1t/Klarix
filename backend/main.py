@@ -1,5 +1,5 @@
 """
-GitChat — FastAPI application entry point.
+Klarix — FastAPI application entry point.
 
 Run with:
     uvicorn main:app --reload --port 8000
@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="GitChat API",
+    title="Klarix API",
     description="Chat with any GitHub repository.",
     version="1.0.0",
     lifespan=lifespan,
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     import uvicorn
 
     def _shutdown(sig, frame):
-        print("\nShutting down GitChat…")
+        print("\nShutting down Klarix…")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, _shutdown)

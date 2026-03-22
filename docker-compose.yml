@@ -1,4 +1,4 @@
-# GitChat — Docker Compose
+# Klarix — Docker Compose
 #
 # Usage:
 #   cp backend/.env.example .env    # Edit with your API keys
@@ -7,19 +7,19 @@
 # The app will be available at http://localhost:8000
 
 services:
-  gitchat:
+  klarix:
     build: .
     ports:
       - "8000:8000"
     volumes:
       # Persist SQLite, ChromaDB, and cloned repos across restarts
-      - gitchat-data:/app/data
+      - klarix-data:/app/data
     env_file:
       - .env
     environment:
       - DATA_DIR=/app/data
-      - DATABASE_URL=sqlite+aiosqlite:////app/data/gitchat.db
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/klarix.db
     restart: unless-stopped
 
 volumes:
-  gitchat-data:
+  klarix-data:

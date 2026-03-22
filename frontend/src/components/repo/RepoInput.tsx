@@ -38,7 +38,7 @@ export function RepoInput({ onSubmit, loading }: Props) {
       <div className="w-full max-w-lg">
         <h1 className="text-2xl font-semibold text-gh-text mb-2">Chat with any GitHub repo</h1>
         <p className="text-gh-muted text-sm mb-6">
-          Paste a public or private GitHub repository URL below. GitChat will index
+          Paste a public or private GitHub repository URL below. Klarix will index
           the code, commits, issues, and PRs — then let you ask anything about it.
         </p>
 

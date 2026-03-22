@@ -145,7 +145,7 @@ def apply_patch(working_path: str, patch_content: str) -> dict:
     1. Write patch_content to a temp file
     2. git apply --check (dry-run to validate)
     3. If check passes: git apply
-    4. Commit with message "GitChat patch: applied from chat"
+    4. Commit with message "Klarix patch: applied from chat"
     5. Return { "success": True, "files_changed": [...], "commit_hash": "..." }
     On failure: return { "success": False, "error": "...", "files_changed": [], "commit_hash": None }
     """
@@ -196,7 +196,7 @@ def apply_patch(working_path: str, patch_content: str) -> dict:
         repo.git.add("-A")
 
         # Commit
-        commit = repo.index.commit("GitChat patch: applied from chat")
+        commit = repo.index.commit("Klarix patch: applied from chat")
         logger.info("Patch applied to %s — commit %s", working_path, commit.hexsha[:7])
 
         return {

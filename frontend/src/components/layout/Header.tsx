@@ -6,7 +6,7 @@ export function Header({ onSettings }: Props) {
   return (
     <header className="flex items-center justify-between px-4 h-12 bg-gh-surface border-b border-gh-border shrink-0">
       <div className="flex items-center gap-2">
-        <span className="text-gh-accent font-semibold text-base tracking-tight">GitChat</span>
+        <span className="text-gh-accent font-semibold text-base tracking-tight">Klarix</span>
       </div>
       <button
         onClick={onSettings}

@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# GitChat — Multi-stage Docker build
+# Klarix — Multi-stage Docker build
 #
 # Stage 1: Build the React frontend
 # Stage 2: Run the FastAPI backend (serves built frontend as static files)

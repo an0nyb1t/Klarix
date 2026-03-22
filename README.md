@@ -36,7 +36,7 @@ Built for **software developers** and **security researchers**.
 ### Docker
 
 ```bash
-git clone https://github.com/AnonyBit981/GitChat.git && cd GitChat
+git clone https://github.com/an0nyb1t/Klarix.git && cd Klarix
 cp .env.example .env        # add your API keys
 docker compose up --build
 ```

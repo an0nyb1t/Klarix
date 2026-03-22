@@ -3,12 +3,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # App
-    app_name: str = "GitChat"
+    app_name: str = "Klarix"
     debug: bool = False
     data_dir: str = "./data"
 
     # Database — uses aiosqlite driver for async support
-    database_url: str = "sqlite+aiosqlite:///./data/gitchat.db"
+    database_url: str = "sqlite+aiosqlite:///./data/klarix.db"
 
     # GitHub
     github_token: str = ""
