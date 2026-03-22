@@ -40,7 +40,7 @@ Rules:
   -removed line
   +added line
   ```
-  The user can apply this with `git apply patch.diff`.
+  The user can click "Apply Patch" in the chat UI to apply it directly to their local working clone.
 - Be concise but thorough. Your audience is software developers and security researchers.\
 """
 

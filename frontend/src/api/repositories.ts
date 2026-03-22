@@ -1,5 +1,5 @@
 import { apiFetch } from './client'
-import type { Repository } from '../types'
+import type { PatchApplyResponse, Repository } from '../types'
 
 export const reposApi = {
   list: () => apiFetch<Repository[]>('/api/repos'),
@@ -23,4 +23,10 @@ export const reposApi = {
       `/api/repos/${id}/resume`,
       { method: 'POST' },
     ),
+
+  applyPatch: (id: string, patch: string) =>
+    apiFetch<PatchApplyResponse>(`/api/repos/${id}/apply-patch`, {
+      method: 'POST',
+      body: JSON.stringify({ patch }),
+    }),
 }

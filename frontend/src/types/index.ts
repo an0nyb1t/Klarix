@@ -7,6 +7,14 @@ export interface Repository {
   default_branch?: string
   last_synced_at?: string
   metadata?: Record<string, unknown>
+  patch_ready: boolean  // V1.3 — true when working clone exists for git apply
+}
+
+export interface PatchApplyResponse {
+  success: boolean
+  files_changed: string[]
+  commit_hash: string | null
+  error: string | null
 }
 
 export interface Conversation {

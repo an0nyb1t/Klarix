@@ -57,3 +57,14 @@ async def migrate_v12() -> None:
         for col_name, stmt in new_columns:
             if col_name not in existing:
                 await conn.execute(text(stmt))
+
+
+async def migrate_v13() -> None:
+    """Add V1.3 patch_ready column to repositories table if it doesn't already exist."""
+    async with engine.begin() as conn:
+        result = await conn.execute(text("PRAGMA table_info(repositories)"))
+        existing = {row[1] for row in result.fetchall()}
+        if "patch_ready" not in existing:
+            await conn.execute(
+                text("ALTER TABLE repositories ADD COLUMN patch_ready BOOLEAN DEFAULT 0")
+            )

@@ -1,13 +1,14 @@
 """
-Repository routes — CRUD + ingestion + SSE progress.
+Repository routes — CRUD + ingestion + SSE progress + patch apply.
 
 Routes:
-  POST   /repos                    Start ingesting a new repository
-  GET    /repos                    List all repositories
-  GET    /repos/{repo_id}          Get repository details
-  POST   /repos/{repo_id}/sync     Re-sync a repository
-  DELETE /repos/{repo_id}          Delete a repository
-  GET    /repos/{repo_id}/progress SSE stream for ingestion/sync progress
+  POST   /repos                          Start ingesting a new repository
+  GET    /repos                          List all repositories
+  GET    /repos/{repo_id}                Get repository details
+  POST   /repos/{repo_id}/sync           Re-sync a repository
+  DELETE /repos/{repo_id}                Delete a repository
+  GET    /repos/{repo_id}/progress       SSE stream for ingestion/sync progress
+  POST   /repos/{repo_id}/apply-patch    Apply a unified diff to the working clone
 """
 
 import asyncio
@@ -19,7 +20,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes.schemas import OkResponse, RepoIngestRequest, RepoListItem, RepoOut
+from app.api.routes.schemas import (
+    OkResponse,
+    PatchApplyRequest,
+    PatchApplyResponse,
+    RepoIngestRequest,
+    RepoListItem,
+    RepoOut,
+)
 from app.ingester.service import clear_progress, get_progress, ingest_repository, resync_repository
 from database import get_db
 from models import Repository
@@ -112,6 +120,7 @@ async def list_repos(db: AsyncSession = Depends(get_db)):
         status=r.status,
         total_commits=r.total_commits,
         last_synced_at=r.last_synced_at,
+        patch_ready=r.patch_ready or False,
     ) for r in repos]
 
 
@@ -174,18 +183,23 @@ async def delete_repo(repo_id: str, db: AsyncSession = Depends(get_db)):
     except Exception as e:
         logger.warning("Failed to delete ChromaDB collection for %s: %s", repo_id, e)
 
-    # Delete cloned git directory
+    # Delete cloned git directories (mirror + working clone)
     try:
         from app.ingester.url_parser import parse_github_url
         from config import settings
         import shutil
         import os
         parsed = parse_github_url(repo.url)
-        clone_path = os.path.join(settings.data_dir, "repos", f"{parsed.owner}_{parsed.repo}.git")
-        if os.path.exists(clone_path):
-            await asyncio.to_thread(shutil.rmtree, clone_path)
+        # Mirror clone (bare)
+        mirror_path = os.path.join(settings.data_dir, "repos", f"{parsed.owner}_{parsed.repo}.git")
+        if os.path.exists(mirror_path):
+            await asyncio.to_thread(shutil.rmtree, mirror_path)
+        # Working clone (V1.3)
+        working_path = os.path.join(settings.project_root, "data", "repos", f"{parsed.owner}_{parsed.repo}")
+        if os.path.exists(working_path):
+            await asyncio.to_thread(shutil.rmtree, working_path)
     except Exception as e:
-        logger.warning("Failed to delete clone directory for %s: %s", repo_id, e)
+        logger.warning("Failed to delete clone directories for %s: %s", repo_id, e)
 
     # Delete DB record (cascades to conversations, messages, checkpoints)
     await db.delete(repo)
@@ -267,6 +281,44 @@ async def get_repo_progress(repo_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.post("/repos/{repo_id}/apply-patch", response_model=PatchApplyResponse)
+async def apply_patch_endpoint(
+    repo_id: str,
+    body: PatchApplyRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Apply a unified diff to the repository's working clone.
+    Returns HTTP 409 if the working clone is not ready yet.
+    """
+    import os
+    from app.ingester.git_service import apply_patch, sync_mirror_from_working
+    from app.ingester.url_parser import parse_github_url
+    from app.ingester.service import _working_clone_path, _clone_path
+
+    repo = await _get_repo_or_404(repo_id, db)
+
+    if not repo.patch_ready:
+        raise HTTPException(
+            status_code=409,
+            detail="Working clone not ready yet. Please wait for background cloning to complete.",
+        )
+
+    parsed = parse_github_url(repo.url)
+    working_path = _working_clone_path(parsed)
+    mirror_path = _clone_path(parsed)
+
+    result = await asyncio.to_thread(apply_patch, working_path, body.patch)
+
+    if result["success"]:
+        try:
+            await asyncio.to_thread(sync_mirror_from_working, working_path, mirror_path)
+        except Exception as e:
+            logger.warning("Mirror sync failed after patch apply for %s: %s", repo_id, e)
+
+    return PatchApplyResponse(**result)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _get_repo_or_404(repo_id: str, db: AsyncSession) -> Repository:
@@ -287,6 +339,7 @@ def _repo_to_out(repo: Repository) -> RepoOut:
         default_branch=repo.default_branch,
         last_synced_at=repo.last_synced_at,
         metadata=repo.metadata_json,
+        patch_ready=repo.patch_ready or False,
     )
 
 

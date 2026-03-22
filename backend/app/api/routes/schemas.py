@@ -25,6 +25,7 @@ class RepoOut(BaseModel):
     default_branch: str | None = None
     last_synced_at: datetime | None = None
     metadata: dict | None = None
+    patch_ready: bool = False  # V1.3 — True when working clone exists
 
     model_config = {"from_attributes": True}
 
@@ -35,8 +36,20 @@ class RepoListItem(BaseModel):
     status: str
     total_commits: int = 0
     last_synced_at: datetime | None = None
+    patch_ready: bool = False  # V1.3 — True when working clone exists
 
     model_config = {"from_attributes": True}
+
+
+class PatchApplyRequest(BaseModel):
+    patch: str  # Unified diff content
+
+
+class PatchApplyResponse(BaseModel):
+    success: bool
+    files_changed: list[str] = []
+    commit_hash: str | None = None
+    error: str | None = None
 
 
 # ── Conversations ─────────────────────────────────────────────────────────────

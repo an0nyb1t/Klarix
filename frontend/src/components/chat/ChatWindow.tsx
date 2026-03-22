@@ -9,12 +9,14 @@ import type { Conversation, Settings } from '../../types'
 interface Props {
   conversation: Conversation
   repoName: string
+  repoId: string
+  patchReady: boolean
   globalSettings: Settings | null
   onModelChange: (updated: Conversation) => void
   onTitleChange?: (updated: Conversation) => void
 }
 
-export function ChatWindow({ conversation, repoName, globalSettings, onModelChange, onTitleChange }: Props) {
+export function ChatWindow({ conversation, repoName, repoId, patchReady, globalSettings, onModelChange, onTitleChange }: Props) {
   const {
     sendMessage,
     messages,
@@ -70,7 +72,7 @@ export function ChatWindow({ conversation, repoName, globalSettings, onModelChan
   }, [messages, streamingContent])
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0">
       {/* Conversation title bar */}
       <div className="flex items-center px-4 h-10 border-b border-gh-border shrink-0 gap-2">
         <span className="text-gh-muted text-xs">{repoName}</span>
@@ -113,7 +115,7 @@ export function ChatWindow({ conversation, repoName, globalSettings, onModelChan
       </div>
 
       {/* Messages scroll area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
         {messages.length === 0 && streamingContent === null && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -129,12 +131,14 @@ export function ChatWindow({ conversation, repoName, globalSettings, onModelChan
         )}
 
         {messages.map(msg => (
-          <MessageBubble key={msg.id} message={msg} />
+          <MessageBubble key={msg.id} message={msg} repoId={repoId} patchReady={patchReady} />
         ))}
 
         {streamingContent !== null && (
           <MessageBubble
             message={{ role: 'assistant', content: streamingContent, isStreaming: true }}
+            repoId={repoId}
+            patchReady={patchReady}
           />
         )}
 

@@ -1,11 +1,19 @@
 import { useState } from 'react'
+import { reposApi } from '../../api/repositories'
 
 interface Props {
   diff: string
+  repoId: string
+  patchReady: boolean
 }
 
-export function DiffViewer({ diff }: Props) {
+export function DiffViewer({ diff, repoId, patchReady }: Props) {
   const [copied, setCopied] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [applyResult, setApplyResult] = useState<{
+    success: boolean
+    message: string
+  } | null>(null)
 
   const lines = diff.split('\n')
 
@@ -25,25 +33,33 @@ export function DiffViewer({ diff }: Props) {
     URL.revokeObjectURL(url)
   }
 
+  const applyPatch = async () => {
+    setApplying(true)
+    setApplyResult(null)
+    try {
+      const result = await reposApi.applyPatch(repoId, diff)
+      if (result.success) {
+        const fileList = result.files_changed.join(', ')
+        setApplyResult({
+          success: true,
+          message: `Applied to ${result.files_changed.length} file(s): ${fileList} (commit ${result.commit_hash?.slice(0, 7)})`,
+        })
+      } else {
+        setApplyResult({ success: false, message: result.error ?? 'Patch failed.' })
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to apply patch.'
+      setApplyResult({ success: false, message: msg })
+    } finally {
+      setApplying(false)
+    }
+  }
+
   return (
     <div className="rounded-lg overflow-hidden border border-gh-border bg-gh-surface my-2">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-gh-border/30 border-b border-gh-border">
+      {/* Header — label only */}
+      <div className="px-3 py-1.5 bg-gh-border/30 border-b border-gh-border">
         <span className="text-gh-muted text-xs font-mono">diff</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={copy}
-            className="text-gh-muted hover:text-gh-text text-xs transition-colors"
-          >
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-          <button
-            onClick={download}
-            className="text-gh-accent hover:text-gh-accent/80 text-xs transition-colors"
-          >
-            Download .patch
-          </button>
-        </div>
       </div>
 
       {/* Diff lines */}
@@ -69,6 +85,52 @@ export function DiffViewer({ diff }: Props) {
           )
         })}
       </pre>
+
+      {/* Footer — action buttons */}
+      <div className="flex items-center justify-end px-3 py-1.5 bg-gh-border/30 border-t border-gh-border gap-2">
+        <button
+          onClick={copy}
+          className="text-gh-muted hover:text-gh-text text-xs transition-colors"
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+        <button
+          onClick={download}
+          className="text-gh-accent hover:text-gh-accent/80 text-xs transition-colors"
+        >
+          Download .patch
+        </button>
+        <button
+          onClick={applyPatch}
+          disabled={!patchReady || applying}
+          title={
+            !patchReady
+              ? 'Working clone not ready yet — please wait a moment after ingestion'
+              : 'Apply this patch to your local working clone'
+          }
+          className={`text-xs px-2 py-0.5 rounded transition-colors ${
+            !patchReady || applying
+              ? 'text-gh-muted cursor-not-allowed opacity-50'
+              : 'bg-gh-success/20 text-gh-success hover:bg-gh-success/30'
+          }`}
+        >
+          {applying ? 'Applying…' : 'Apply Patch'}
+        </button>
+      </div>
+
+      {/* Apply result banner */}
+      {applyResult && (
+        <div
+          className={`px-3 py-1.5 text-xs border-t border-gh-border ${
+            applyResult.success
+              ? 'bg-gh-success/10 text-gh-success'
+              : 'bg-gh-danger/10 text-gh-danger'
+          }`}
+        >
+          {applyResult.success ? '✓ ' : '✗ '}
+          {applyResult.message}
+        </div>
+      )}
     </div>
   )
 }

@@ -20,10 +20,13 @@ from app.ingester.git_service import (
     GitServiceError,
     RepoTooLargeError,
     clone_repository,
+    clone_working_copy,
     extract_branches,
     extract_commits,
     extract_files,
     fetch_updates,
+    pull_working_copy,
+    sync_mirror_from_working,
 )
 from app.ingester.github_service import GitHubService, GitHubServiceError
 from app.ingester.schemas import ExtractedBranch, ExtractedData, IngestionProgress
@@ -64,6 +67,64 @@ def _set_progress(repo_id: str, stage: str, current: int, total: int, message: s
 
 def _clone_path(parsed: ParsedRepoURL) -> str:
     return os.path.join(settings.data_dir, "repos", f"{parsed.owner}_{parsed.repo}.git")
+
+
+def _working_clone_path(parsed: ParsedRepoURL) -> str:
+    return os.path.join(settings.project_root, "data", "repos", f"{parsed.owner}_{parsed.repo}")
+
+
+# ── V1.3 working clone helpers ────────────────────────────────────────────────
+
+async def _create_working_clone(repo_id: str, parsed: ParsedRepoURL) -> None:
+    """
+    Background task: clone from local mirror to create a working copy with checkout.
+    Sets patch_ready=True in DB when done. Non-fatal — logs errors but doesn't raise.
+    """
+    from database import AsyncSessionLocal
+    mirror_path = _clone_path(parsed)
+    working_path = _working_clone_path(parsed)
+    try:
+        logger.info("Creating working clone for %s...", parsed.full_name)
+        await asyncio.to_thread(clone_working_copy, mirror_path, working_path)
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Repository).where(Repository.id == repo_id))
+            repo = result.scalar_one_or_none()
+            if repo:
+                repo.patch_ready = True
+                await db.commit()
+        logger.info("Working clone ready for %s at %s", parsed.full_name, working_path)
+    except Exception as e:
+        logger.error("Working clone failed for %s: %s", parsed.full_name, e)
+
+
+async def _backfill_working_clones() -> None:
+    """
+    V1.3 startup: for repos with status='ready' and patch_ready=False,
+    check if working clone already exists on disk — if so set patch_ready=True,
+    otherwise launch a background clone task.
+    """
+    from database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Repository).where(
+                Repository.status == "ready",
+                Repository.patch_ready == False,  # noqa: E712
+            )
+        )
+        repos = result.scalars().all()
+        for repo in repos:
+            try:
+                parsed = parse_github_url(repo.url)
+            except InvalidGitHubURL:
+                continue
+            working_path = _working_clone_path(parsed)
+            if os.path.isdir(working_path):
+                repo.patch_ready = True
+                logger.info("Backfill: found existing working clone for %s", repo.name)
+            else:
+                asyncio.create_task(_create_working_clone(repo.id, parsed))
+                logger.info("Backfill: launched working clone task for %s", repo.name)
+        await db.commit()
 
 
 # ── DB helpers ───────────────────────────────────────────────────────────────
@@ -349,12 +410,16 @@ async def _run_ingestion(
 
     # ── Step 10: Finalize ─────────────────────────────────────────────────────
     repo.status = "ready"
+    repo.patch_ready = False  # Working clone creates in background
     repo.last_synced_at = datetime.now(timezone.utc)
     await db.flush()
     await db.commit()
 
     await cp_mgr.clear(repo.id, "ingestion")
     await db.commit()
+
+    # Launch working clone in background — chat is available immediately
+    asyncio.create_task(_create_working_clone(repo.id, parsed))
 
     _set_progress(repo.id, "complete", 1, 1, f"Repository '{repo.name}' is ready.")
 
@@ -455,6 +520,11 @@ async def resync_repository(repo_id: str, db: AsyncSession) -> Repository:
         # git fetch
         _set_progress(repo.id, "fetching_updates", 0, -1, "Fetching git updates...")
         await asyncio.to_thread(fetch_updates, clone_path)
+
+        # Pull working clone from mirror (non-fatal)
+        working_path = _working_clone_path(parsed)
+        if os.path.isdir(working_path):
+            await asyncio.to_thread(pull_working_copy, working_path)
 
         # Re-run ingestion with fresh state (incremental handled by git fetch)
         # For simplicity in V1, re-ingest fully after fetch

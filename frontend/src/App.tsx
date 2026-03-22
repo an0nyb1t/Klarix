@@ -168,6 +168,8 @@ export default function App() {
         <ChatWindow
           conversation={selectedConv}
           repoName={selectedRepo.name}
+          repoId={selectedRepo.id}
+          patchReady={selectedRepo.patch_ready}
           globalSettings={settings}
           onModelChange={handleModelChange}
           onTitleChange={handleModelChange}

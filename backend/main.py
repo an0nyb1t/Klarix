@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.llm.exceptions import LLMError
 from config import settings
-from database import init_db, migrate_v12
+from database import init_db, migrate_v12, migrate_v13
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +56,18 @@ async def lifespan(app: FastAPI):
     # Run V1.2 migrations (adds columns if not present — safe to re-run)
     await migrate_v12()
 
+    # Run V1.3 migrations (adds patch_ready column to repositories)
+    await migrate_v13()
+
     # Load user-saved settings from DB into the in-memory singleton
     from app.api.routes.settings import _apply_settings_to_memory
     from database import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
         await _apply_settings_to_memory(db)
+
+    # V1.3 backfill: set patch_ready=True for repos that already have working clones
+    from app.ingester.service import _backfill_working_clones
+    await _backfill_working_clones()
 
     # Start background task to reset LLM TPM counter every minute
     tpm_reset_task = asyncio.create_task(_reset_tpm_loop())

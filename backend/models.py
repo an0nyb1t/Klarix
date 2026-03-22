@@ -25,6 +25,8 @@ class Repository(Base):
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     metadata_json: Mapped[dict | None] = mapped_column(JSON)
+    # V1.3 — True when the working clone (for git apply) is ready
+    patch_ready: Mapped[bool] = mapped_column(Boolean, default=False)
 
     conversations: Mapped[list["Conversation"]] = relationship(
         back_populates="repository", cascade="all, delete-orphan"

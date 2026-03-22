@@ -7,6 +7,8 @@ Callers in the async service.py must wrap calls using asyncio.to_thread().
 
 import logging
 import os
+import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -113,6 +115,139 @@ def fetch_updates(clone_path: str) -> None:
         repo.git.fetch("--all", "--prune")
     except GitCommandError as e:
         raise GitServiceError(f"Git fetch failed: {e.stderr.strip() if e.stderr else str(e)}")
+
+
+def clone_working_copy(mirror_path: str, working_path: str) -> git.Repo:
+    """
+    Clone from a local mirror to create a working copy with full checkout.
+    Fast — no network call, just a local filesystem copy + checkout.
+    If a working copy already exists, returns it directly.
+    """
+    if os.path.exists(working_path):
+        logger.info("Working copy already exists at %s", working_path)
+        return git.Repo(working_path)
+
+    os.makedirs(os.path.dirname(working_path), exist_ok=True)
+    logger.info("Creating working clone from mirror %s → %s", mirror_path, working_path)
+    try:
+        repo = git.Repo.clone_from(mirror_path, working_path)
+        return repo
+    except GitCommandError as e:
+        raise GitServiceError(
+            f"Working clone failed: {e.stderr.strip() if e.stderr else str(e)}"
+        )
+
+
+def apply_patch(working_path: str, patch_content: str) -> dict:
+    """
+    Apply a unified diff to the working clone.
+
+    1. Write patch_content to a temp file
+    2. git apply --check (dry-run to validate)
+    3. If check passes: git apply
+    4. Commit with message "GitChat patch: applied from chat"
+    5. Return { "success": True, "files_changed": [...], "commit_hash": "..." }
+    On failure: return { "success": False, "error": "...", "files_changed": [], "commit_hash": None }
+    """
+    try:
+        repo = git.Repo(working_path)
+    except Exception as e:
+        return {"success": False, "error": f"Could not open working clone: {e}",
+                "files_changed": [], "commit_hash": None}
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".patch", delete=False) as f:
+        f.write(patch_content)
+        patch_file = f.name
+
+    try:
+        # Dry-run check
+        result = subprocess.run(
+            ["git", "apply", "--check", patch_file],
+            cwd=working_path,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            error = result.stderr.strip() or result.stdout.strip() or "Patch does not apply cleanly."
+            return {"success": False, "error": error, "files_changed": [], "commit_hash": None}
+
+        # Apply for real
+        subprocess.run(
+            ["git", "apply", patch_file],
+            cwd=working_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Collect changed files
+        files_changed = [item.a_path for item in repo.index.diff(None)]
+        if not files_changed:
+            # Changes may be unstaged — use git diff --name-only
+            diff_result = subprocess.run(
+                ["git", "diff", "--name-only"],
+                cwd=working_path,
+                capture_output=True,
+                text=True,
+            )
+            files_changed = [f for f in diff_result.stdout.strip().splitlines() if f]
+
+        # Stage all changes
+        repo.git.add("-A")
+
+        # Commit
+        commit = repo.index.commit("GitChat patch: applied from chat")
+        logger.info("Patch applied to %s — commit %s", working_path, commit.hexsha[:7])
+
+        return {
+            "success": True,
+            "files_changed": files_changed,
+            "commit_hash": commit.hexsha,
+            "error": None,
+        }
+
+    except subprocess.CalledProcessError as e:
+        error = e.stderr.strip() if e.stderr else str(e)
+        return {"success": False, "error": error, "files_changed": [], "commit_hash": None}
+    except Exception as e:
+        return {"success": False, "error": str(e), "files_changed": [], "commit_hash": None}
+    finally:
+        os.unlink(patch_file)
+
+
+def sync_mirror_from_working(working_path: str, mirror_path: str) -> None:
+    """
+    After applying a patch to the working clone, update the mirror so it stays in sync.
+    Runs: git --git-dir=<mirror_path> fetch <working_path>
+    """
+    try:
+        subprocess.run(
+            ["git", f"--git-dir={mirror_path}", "fetch", working_path],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        logger.info("Mirror synced from working clone %s", working_path)
+    except subprocess.CalledProcessError as e:
+        error = e.stderr.strip() if e.stderr else str(e)
+        raise GitServiceError(f"Mirror sync failed: {error}")
+
+
+def pull_working_copy(working_path: str) -> None:
+    """Pull latest changes from origin (mirror) into the working clone. Used during re-sync."""
+    try:
+        subprocess.run(
+            ["git", "pull"],
+            cwd=working_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        logger.info("Working clone pulled at %s", working_path)
+    except subprocess.CalledProcessError as e:
+        # Non-fatal — log and continue; mirror is still up to date
+        logger.warning("Working clone pull failed at %s: %s", working_path,
+                       e.stderr.strip() if e.stderr else str(e))
 
 
 def extract_branches(repo: git.Repo) -> list[ExtractedBranch]:

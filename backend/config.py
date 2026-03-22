@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # Embeddings
     embedding_model: str = "all-MiniLM-L6-v2"
 
+    # Working clones directory (project root — resolved relative to backend/)
+    project_root: str = ".."
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
