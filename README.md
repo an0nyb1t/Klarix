@@ -1,13 +1,12 @@
 <div align="center">
 
-# GitChat
+# Klarix
 
-**Chat with any GitHub repository.**
+**Your codebase, fully understood.**
 
-Paste a repo URL — GitChat ingests the code, commits, issues, and PRs,
-then lets you ask questions, explore the codebase, and generate patches.
-
-All from a single self-hosted app. No data leaves your machine.
+AI-powered platform that ingests GitHub repos and turns code, commits, issues,
+and PRs into a conversational knowledge base. Generate and apply patches
+to a local clone — all self-hosted, your data never leaves your machine.
 
 ---
 
