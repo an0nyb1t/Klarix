@@ -1,116 +1,118 @@
+<div align="center">
+
 # GitChat
 
-Chat with any GitHub repository. Paste a repo URL, GitChat ingests the code, commits, issues, and PRs, then lets you ask questions and generate patches — all from a single self-hosted app.
+**Chat with any GitHub repository.**
+
+Paste a repo URL — GitChat ingests the code, commits, issues, and PRs,
+then lets you ask questions, explore the codebase, and generate patches.
+
+All from a single self-hosted app. No data leaves your machine.
+
+---
 
 Built for **software developers** and **security researchers**.
 
+[Quick Start](#quick-start) &middot; [Features](#features) &middot; [Configuration](#configuration) &middot; [Tech Stack](#tech-stack)
+
+</div>
+
+---
+
 ## Features
 
-- **Full repo ingestion** — code files, commit history, branches, issues, pull requests
-- **RAG-powered chat** — answers grounded in actual repo content, not hallucinations
-- **Diff generation** — ask for code changes and get downloadable `git apply`-compatible patches
-- **Multi-provider LLM** — Anthropic, OpenAI, Ollama, or any OpenAI-compatible endpoint
-- **Local embeddings** — sentence-transformers runs on your machine, no data leaves your network
-- **Rate limit awareness** — auto-pause and resume when GitHub or LLM limits are hit
-- **Checkpoint/resume** — long ingestions survive interruptions and pick up where they left off
+| | |
+|---|---|
+| **Full Repo Ingestion** | Code files, commit history, branches, issues, pull requests — everything indexed and searchable |
+| **RAG-Powered Chat** | Answers grounded in actual repo content with source citations, not hallucinations |
+| **Diff Generation** | Ask for code changes and get `git apply`-compatible patches you can download or apply directly |
+| **Apply Patch** | One-click patch application from the chat UI — changes committed to a local working clone |
+| **Multi-Provider LLM** | Anthropic, OpenAI, Ollama, Claude Code CLI, or any OpenAI-compatible endpoint |
+| **Local Embeddings** | Sentence-transformers runs on your machine — your code stays private |
+| **Checkpoint & Resume** | Long ingestions survive interruptions and pick up exactly where they left off |
+| **Rate Limit Awareness** | Auto-pause and resume when GitHub or LLM rate limits are hit |
 
-## Quick Start (Docker)
+## Quick Start
+
+### Docker
 
 ```bash
-git clone <your-repo-url> && cd GitHub_Chatbot
-cp .env.example .env        # Add your API keys
+git clone https://github.com/AnonyBit981/GitChat.git && cd GitChat
+cp .env.example .env        # add your API keys
 docker compose up --build
 ```
 
-Open **http://localhost:8000**. Paste a GitHub repo URL and start chatting.
+Open **http://localhost:8000** — paste a GitHub repo URL and start chatting.
 
-## Quick Start (Local Development)
+### Local Development
 
-### Prerequisites
-
-- Python 3.11+
-- Node.js 18+
-- Git
-
-### Backend
+**Prerequisites:** Python 3.11+ &middot; Node.js 18+ &middot; Git
 
 ```bash
+# Backend
 cd backend
-python -m venv .venv
-source .venv/bin/activate    # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env         # Add your API keys
+cp .env.example .env
 uvicorn main:app --reload --port 8000
-```
 
-The first run downloads the embedding model (~90 MB). Subsequent starts are instant.
-
-### Frontend
-
-```bash
+# Frontend (separate terminal)
 cd frontend
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
-Open **http://localhost:5173**. The Vite dev server proxies `/api` requests to the backend.
+> The first run downloads the embedding model (~90 MB). Subsequent starts are instant.
 
-### Production build (without Docker)
+Dev server runs at **http://localhost:5173** with API proxy to the backend.
+
+### Production Build
 
 ```bash
 cd frontend && npm run build && cd ..
 cd backend && uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-The backend serves the built frontend automatically from `frontend/dist/`.
+The backend serves the built frontend from `frontend/dist/`.
+
+---
 
 ## Configuration
 
-All settings can be configured via environment variables (`.env`) **or directly from the in-app Settings UI** (click the gear icon). You can set your LLM provider, API keys, model, and GitHub token from the UI without editing any files.
+All settings can be configured via `.env` **or the in-app Settings UI** (gear icon) — no file editing required.
 
 | Variable | Default | Description |
 |---|---|---|
-| `GITHUB_TOKEN` | *(empty)* | GitHub PAT — required for private repos, raises rate limit to 5K/hr |
-| `LLM_PROVIDER` | `anthropic` | `anthropic`, `openai`, `ollama`, `custom`, or `claude_code` |
-| `LLM_API_KEY` | *(empty)* | API key for cloud providers |
-| `LLM_MODEL` | `claude-sonnet-4-20250514` | Model name |
-| `LLM_BASE_URL` | *(empty)* | Endpoint URL for Ollama/custom providers |
-| `LLM_RATE_LIMIT_TPM` | `0` | Tokens-per-minute limit (0 = disabled) |
-| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence-transformers model for embeddings |
+| `GITHUB_TOKEN` | — | GitHub PAT for private repos (raises rate limit to 5K/hr) |
+| `LLM_PROVIDER` | — | LLM provider to use |
+| `LLM_API_KEY` | — | API key for your chosen provider |
+| `LLM_MODEL` | — | Model identifier |
+| `LLM_BASE_URL` | — | Endpoint URL for self-hosted providers |
+| `LLM_RATE_LIMIT_TPM` | `0` | Tokens-per-minute cap (0 = unlimited) |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Local embedding model |
 
-### Using Claude Code (no API key needed — uses your $20/month subscription)
+Supports cloud providers, local models, and CLI-based integrations. See `.env.example` for details.
 
-```bash
-# .env
-LLM_PROVIDER=claude_code
-LLM_MODEL=sonnet
-```
+---
 
-Requires the Claude Code CLI installed (`npm install -g @anthropic-ai/claude-code`) and authenticated (`claude auth`).
-
-### Using Ollama (fully local, no API keys)
-
-```bash
-# .env
-LLM_PROVIDER=ollama
-LLM_MODEL=llama3
-LLM_BASE_URL=http://localhost:11434
-LLM_RATE_LIMIT_TPM=0
-```
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, TypeScript, Tailwind CSS, Vite |
-| Backend | Python 3.11+, FastAPI, async SQLAlchemy |
+| Frontend | React 18 &middot; TypeScript &middot; Tailwind CSS &middot; Vite |
+| Backend | Python 3.11+ &middot; FastAPI &middot; Async SQLAlchemy |
 | Vector DB | ChromaDB (local, file-based) |
 | Database | SQLite (zero config) |
-| Git ops | GitPython |
+| Git | GitPython &middot; dual-clone architecture (mirror + working) |
 | GitHub API | PyGithub |
 | LLM | LiteLLM (multi-provider) |
 | Embeddings | sentence-transformers (local) |
 
-Interactive API docs at **http://localhost:8000/docs**.
+---
 
-## License
+<div align="center">
 
-MIT
+API docs at **http://localhost:8000/docs**
+
+**MIT License**
+
+</div>
